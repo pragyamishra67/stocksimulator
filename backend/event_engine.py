@@ -45,9 +45,13 @@ class EventEngine:
 
             if event.target == stock or state.sector_map.get(stock) == event.target:
 
-                drift_adj += event.sentiment * event.impact * decay
-                vol_adj += event.impact * decay
+                drift_adj += 2 * event.sentiment * event.impact * decay
+                vol_adj += 1.5 * event.impact * decay
                 volume_adj += event.volume_spike * decay
+
+        return drift_adj, vol_adj, volume_adj
+        # 🔥 CLEANUP DEAD EVENTS
+        self.active_events = alive_events
 
         return drift_adj, vol_adj, volume_adj
 event_engine = EventEngine()

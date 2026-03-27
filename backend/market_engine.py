@@ -15,7 +15,7 @@ class MarketEngine:
         self.sigma = 0.01
         self.dt = 1
 
-    def generate_tick(self):
+    def generate_tick(self, candle_engine):
 
         market_noise = np.random.normal()
 
@@ -49,6 +49,7 @@ class MarketEngine:
                         state.base_volume[stock] *
                         (1 + np.random.uniform(-0.25, 0.25) + volume_adj)
                         )
+            candle_engine.process_tick(stock, new_price, volume)
 
             state.stock_prices[stock] = new_price
 

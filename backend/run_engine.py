@@ -4,6 +4,7 @@ import os
 sys.path.append("D:/stocksimulator")
 
 import time
+import random
 
 from market_engine import MarketEngine
 from candle_engine import CandleEngine
@@ -14,6 +15,14 @@ from analytics.pattern_engine import PatternEngine
 
 from event_engine import MarketEvent, event_engine
 
+from news_engine import NewsEngine, news_to_event
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
+
+news_engine = NewsEngine(api_key)
 
 engine = MarketEngine()
 candle_engine = CandleEngine()
@@ -33,9 +42,9 @@ event_engine.add_event(test_event)
 
 
 while True:
+    
 
-    engine.generate_tick()
-    candle_engine.update()
+    engine.generate_tick(candle_engine)
 
     print("\n========== MARKET SNAPSHOT ==========")
 
@@ -55,7 +64,7 @@ while True:
     for stock in state.stock_prices:
         print(stock, len(state.candle_data[stock]))
 
-    # ⭐ Analytics block (VERY IMPORTANT)
+    # Analytics block - Risk Ratios and Patterns
     print("\nAnalytics:")
     for stock in state.stock_prices:
 
@@ -65,7 +74,24 @@ while True:
         print(stock,
               "RiskRatio:", round(ratio, 4),
               "Pattern:", pattern)
+    print("\nActive Events:", len(event_engine.active_events))
 
     print("\nTotal ticks:", len(state.tick_data))
+    if random.random() < 0.1:
+
+        news = news_engine.generate_news()
+
+        print("\nRAW NEWS:", news)
+
+        if news_engine.validate(news):
+
+            print("\n📰 NEWS:", news["headline"])
+
+            event = news_to_event(news)
+
+            event_engine.add_event(event)
+
+        else:
+            print("⚠️ Invalid news skipped")
 
     time.sleep(1)
