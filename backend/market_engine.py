@@ -1,3 +1,7 @@
+from event_engine import EventEngine
+
+event_engine = EventEngine()
+
 import numpy as np
 from datetime import datetime
 from state import state
@@ -22,6 +26,7 @@ class MarketEngine:
         }
 
         for stock in state.stock_prices:
+            drift_adj, vol_adj, volume_adj = event_engine.get_effect(stock)
 
             price = state.stock_prices[stock]
 
@@ -33,15 +38,17 @@ class MarketEngine:
                 0.2 * individual_noise
             )
 
-            new_price = price * np.exp(
-                (self.mu - 0.5*self.sigma**2)*self.dt +
-                self.sigma*np.sqrt(self.dt)*noise
-            )
+            mu_eff = self.mu + drift_adj
+            sigma_eff = self.sigma + vol_adj
 
-            volume = int(
-                state.base_volume[stock] *
-                (1 + np.random.uniform(-0.25, 0.25))
+            new_price = price * np.exp(
+                (mu_eff - 0.5 * sigma_eff**2) * self.dt +
+                   sigma_eff * np.sqrt(self.dt) * noise
             )
+            volume = int(
+                        state.base_volume[stock] *
+                        (1 + np.random.uniform(-0.25, 0.25) + volume_adj)
+                        )
 
             state.stock_prices[stock] = new_price
 

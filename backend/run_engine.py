@@ -1,3 +1,8 @@
+import sys
+import os
+
+sys.path.append("D:/stocksimulator")
+
 import time
 
 from market_engine import MarketEngine
@@ -7,12 +12,24 @@ from state import state
 from analytics.risk_engine import RiskEngine
 from analytics.pattern_engine import PatternEngine
 
+from event_engine import MarketEvent, event_engine
+
 
 engine = MarketEngine()
 candle_engine = CandleEngine()
 
 risk_engine = RiskEngine()
 pattern_engine = PatternEngine()
+
+test_event = MarketEvent(
+    sentiment=0.8,       # strong positive
+    impact=0.6,          # medium-strong impact
+    duration=30,         # lasts 30 seconds
+    target="IT",         # affects TCS & INFY
+    volume_spike=0.5     # volume increase
+)
+
+event_engine.add_event(test_event)
 
 
 while True:

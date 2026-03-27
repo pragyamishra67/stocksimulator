@@ -1,5 +1,5 @@
 import numpy as np
-from backend.state import state
+from state import state
 
 
 class VolatilityEngine:
