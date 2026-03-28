@@ -42,8 +42,8 @@ event_engine.add_event(test_event)
 
 
 while True:
-    
 
+    # -------- MARKET UPDATE --------
     engine.generate_tick(candle_engine)
 
     print("\n========== MARKET SNAPSHOT ==========")
@@ -52,46 +52,36 @@ while True:
     for stock, price in state.stock_prices.items():
         print(stock, round(price, 2))
 
-    # Latest volume info
     if state.tick_data:
         last = state.tick_data[-1]
-        print("\nLatest Tick Volume:",
-              last["stock"],
-              last["volume"])
+        print("\nLatest Tick Volume:", last["stock"], last["volume"])
 
-    # Candle count for ALL stocks
     print("\nCandles formed:")
     for stock in state.stock_prices:
         print(stock, len(state.candle_data[stock]))
 
-    # Analytics block - Risk Ratios and Patterns
     print("\nAnalytics:")
     for stock in state.stock_prices:
-
         ratio = risk_engine.get_ratio(stock)
         pattern = pattern_engine.detect(stock)
+        print(stock, "RiskRatio:", round(ratio, 4), "Pattern:", pattern)
 
-        print(stock,
-              "RiskRatio:", round(ratio, 4),
-              "Pattern:", pattern)
-    print("\nActive Events:", len(event_engine.active_events))
+    # 🔥 NEWS BLOCK MUST BE HERE (INSIDE LOOP)
+    print("\n--- DEBUG START ---")
 
-    print("\nTotal ticks:", len(state.tick_data))
-    if random.random() < 0.1:
+    news = news_engine.generate_news()
+    print("RAW NEWS:", news)
 
-        news = news_engine.generate_news()
+    is_valid = news_engine.validate(news)
+    print("IS VALID:", is_valid)
 
-        print("\nRAW NEWS:", news)
+    if is_valid:
+        print("HEADLINE:", news.get("headline"))
+        event = news_to_event(news)
+        event_engine.add_event(event)
+    else:
+        print("❌ FAILED VALIDATION")
 
-        if news_engine.validate(news):
-
-            print("\n📰 NEWS:", news["headline"])
-
-            event = news_to_event(news)
-
-            event_engine.add_event(event)
-
-        else:
-            print("⚠️ Invalid news skipped")
+    print("--- DEBUG END ---")
 
     time.sleep(1)

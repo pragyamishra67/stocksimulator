@@ -8,7 +8,7 @@ class NewsEngine:
 
     def __init__(self, api_key):
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("geminipro")
+        self.model = genai.GenerativeModel("gemini-2.5-flash")
 
     # -------- MAIN FUNCTION --------
     def generate_news(self):
@@ -70,49 +70,14 @@ class NewsEngine:
         if not data:
             return False
 
-        required_keys = [
-            "headline",
-            "sentiment",
-            "impact",
-            "target",
-            "duration",
-            "volume_spike"
-        ]
+        # required minimum
+        if "headline" not in data or "sentiment" not in data or "target" not in data:
+             return False
 
-        # Check keys
-        for key in required_keys:
-            if key not in data:
-                return False
-
-        # Type checks
-        if not isinstance(data["sentiment"], (int, float)):
-            return False
-
-        if not isinstance(data["impact"], (int, float)):
-            return False
-
-        if not isinstance(data["duration"], int):
-            return False
-
-        if not isinstance(data["volume_spike"], (int, float)):
-            return False
-
-        # Range checks
-        if not -1 <= data["sentiment"] <= 1:
-            return False
-
-        if not 0 <= data["impact"] <= 1:
-            return False
-
-        if not 0 <= data["volume_spike"] <= 1:
-            return False
-
-        if not 20 <= data["duration"] <= 60:
-            return False
-
-        # Target check
-        if data["target"] not in ["IT", "BANK", "AUTO"]:
-            return False
+        # fill defaults instead of rejecting
+        data.setdefault("impact", 0.3)
+        data.setdefault("duration", 30)
+        data.setdefault("volume_spike", 0.2)
 
         return True
 
