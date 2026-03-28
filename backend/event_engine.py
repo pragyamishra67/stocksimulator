@@ -29,29 +29,23 @@ class EventEngine:
     def add_event(self, event):
         self.active_events.append(event)
 
-    def get_effect(self, stock):
+    # ✅ THIS IS THE IMPORTANT PART
+    def update(self):
 
-        drift_adj = 0
-        vol_adj = 0
-        volume_adj = 0
+        updated_events = []
 
         for event in self.active_events:
 
-            decay = event.decay_factor()
+            # decay impact
+            event["impact"] *= event["decay"]
 
-            # remove dead events
-            if decay < 0.05:
-                continue
+            # reduce duration
+            event["duration"] -= 1
 
-            if event.target == stock or state.sector_map.get(stock) == event.target:
+            # keep only active events
+            if event["duration"] > 0 and abs(event["impact"]) > 0.01:
+                updated_events.append(event)
 
-                drift_adj += 2 * event.sentiment * event.impact * decay
-                vol_adj += 1.5 * event.impact * decay
-                volume_adj += event.volume_spike * decay
+        self.active_events = updated_events
 
-        return drift_adj, vol_adj, volume_adj
-        # 🔥 CLEANUP DEAD EVENTS
-        self.active_events = alive_events
-
-        return drift_adj, vol_adj, volume_adj
 event_engine = EventEngine()

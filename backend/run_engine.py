@@ -45,6 +45,7 @@ while True:
 
     # -------- MARKET UPDATE --------
     engine.generate_tick(candle_engine)
+    event_engine.update()
 
     print("\n========== MARKET SNAPSHOT ==========")
 

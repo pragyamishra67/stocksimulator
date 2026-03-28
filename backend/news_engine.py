@@ -87,13 +87,13 @@ from event_engine import MarketEvent
 
 
 def news_to_event(news):
-    scaled_impact = news["impact"] * 2
-    scaled_impact = min(scaled_impact, 1)
 
-    return MarketEvent(
-        sentiment=news["sentiment"],
-        impact=scaled_impact,
-        duration=news["duration"],
-        target=news["target"],
-        volume_spike=news["volume_spike"]
-    )
+    return {
+        "target": news.get("target", "IT"),
+        "impact": news.get("impact", 0.3),
+        "sentiment": news.get("sentiment", 0),
+        "duration": news.get("duration", 30),
+
+        # ✅ NEW
+        "decay": 0.97   # controls how fast effect fades
+    }
