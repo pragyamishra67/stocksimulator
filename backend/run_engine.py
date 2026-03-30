@@ -40,7 +40,7 @@ news_engine = NewsEngine(API_KEY)
 
 # -------- RATE CONTROL --------
 last_news_time = 0
-NEWS_INTERVAL = 15   # seconds
+NEWS_INTERVAL = 20   # seconds
 
 
 # -------- MAIN LOOP --------
@@ -95,7 +95,7 @@ while True:
         else:
             print("⚠️ Invalid or empty news skipped")
 
-        last_news_time = current_time
+        last_news_time = time.time()
 
     # -------- LOOP DELAY --------
     time.sleep(1)

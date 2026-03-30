@@ -40,7 +40,8 @@ class NewsEngine:
                 print(f"⚠️ Gemini error (attempt {attempt+1}):", e)
 
                 if "429" in str(e):
-                    time.sleep(6)
+                    print("⚠️ Rate limit caught! Aborting retry to maintain cadence.")
+                    return None
                 else:
                     time.sleep(1)
 
