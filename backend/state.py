@@ -29,5 +29,6 @@ class MarketState:
         self.tick_data = []
         self.candle_data = defaultdict(list)
         self.current_candle = {}
+        self.base_prices = self.stock_prices.copy()
 
 state = MarketState()

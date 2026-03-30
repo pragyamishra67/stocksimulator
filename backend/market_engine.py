@@ -8,8 +8,8 @@ class MarketEngine:
         self.state = state
         self.event_engine = event_engine
 
-        # GBM parameters
-        self.mu = 0.0001
+        # FIX 1: remove positive drift bias
+        self.mu = 0.0
         self.sigma = 0.01
         self.dt = 1
 
@@ -29,7 +29,6 @@ class MarketEngine:
         # -------- LOOP OVER STOCKS --------
         for stock in state.stock_prices:
 
-            # ✅ CORRECT: use SAME event engine everywhere
             drift_adj, vol_adj, volume_adj = self.event_engine.get_effect(stock)
 
             price = state.stock_prices[stock]
@@ -43,15 +42,27 @@ class MarketEngine:
                 0.2 * individual_noise
             )
 
+            # -------- MEAN REVERSION (CRITICAL FIX) --------
+            base_price = state.base_prices[stock]
+            reversion = -0.001 * (price - base_price) / base_price
+
             # -------- DRIFT & VOL --------
-            mu_eff = self.mu + drift_adj
+            mu_eff = self.mu + drift_adj + reversion
             sigma_eff = self.sigma + vol_adj
 
-            # -------- PRICE UPDATE (GBM) --------
-            new_price = price * np.exp(
+            # -------- GBM CHANGE --------
+            change = (
                 (mu_eff - 0.5 * sigma_eff**2) * self.dt +
                 sigma_eff * np.sqrt(self.dt) * noise
             )
+
+            # -------- CLAMP EXTREME MOVES (CRITICAL FIX) --------
+            change = np.clip(change, -0.02, 0.02)
+
+            new_price = price * (1 + change)
+
+            # -------- SAFETY: prevent zero/negative --------
+            new_price = max(new_price, 1)
 
             # -------- VOLUME --------
             volume = int(
@@ -70,4 +81,4 @@ class MarketEngine:
             })
 
             # -------- UPDATE CANDLE --------
-            candle_engine.update(stock, new_price, volume)
+            candle_engine.process_tick(stock, new_price, volume)

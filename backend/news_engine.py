@@ -1,60 +1,81 @@
-import google.generativeai as genai
+import time
 import json
 import re
-import time
+from google import genai
+from event_engine import MarketEvent   # ✅ ADD THIS
 
 
 class NewsEngine:
 
     def __init__(self, api_key):
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("gemini-2.5-flash")
+        self.client = genai.Client(api_key=api_key)
 
     # -------- MAIN FUNCTION --------
     def generate_news(self):
 
-        prompt = """
-        Generate a realistic financial market news event.
+        prompt = self._build_prompt()
 
-        STRICT RULES:
-        - Output ONLY valid JSON
-        - No explanation
-        - No markdown
-        - No extra text
-
-        JSON FORMAT:
-        {
-          "headline": string,
-          "sentiment": float between -1 and 1,
-          "impact": float between 0 and 1,
-          "target": one of ["IT", "BANK", "AUTO"],
-          "duration": integer between 20 and 60,
-          "volume_spike": float between 0 and 1
-        }
-        """
-
-        for attempt in range(3):  # retry 3 times
+        for attempt in range(3):
             try:
-                response = self.model.generate_content(prompt)
-                raw_text = response.text.strip()
-                return self._safe_parse(raw_text)
+                response = self.client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt
+                )
+
+                raw_text = (response.text or "").strip()
+
+                if not raw_text:
+                    print("⚠️ Empty response from Gemini")
+                    return None
+
+                parsed = self._safe_parse(raw_text)
+
+                if self.validate(parsed):
+                    return parsed
+                else:
+                    print("⚠️ Invalid structure from Gemini")
+                    return None
 
             except Exception as e:
                 print(f"⚠️ Gemini error (attempt {attempt+1}):", e)
-                time.sleep(1)
+
+                if "429" in str(e):
+                    time.sleep(6)
+                else:
+                    time.sleep(1)
 
         return None
 
-    # -------- SAFE PARSING --------
+    # -------- PROMPT --------
+    def _build_prompt(self):
+        return """
+Generate a realistic financial market news event.
+
+STRICT RULES:
+- Output ONLY valid JSON
+- No explanation
+- No markdown
+- No extra text
+
+JSON FORMAT:
+{
+  "headline": string,
+  "sentiment": float between -1 and 1,
+  "impact": float between 0 and 1,
+  "target": one of ["IT", "BANK", "AUTO"],
+  "duration": integer between 20 and 60,
+  "volume_spike": float between 0 and 1
+}
+"""
+
+    # -------- SAFE PARSE --------
     def _safe_parse(self, text):
 
-        # Try direct JSON
         try:
             return json.loads(text)
         except:
             pass
 
-        # Try extracting JSON block
         match = re.search(r"\{.*\}", text, re.DOTALL)
         if match:
             try:
@@ -70,11 +91,9 @@ class NewsEngine:
         if not data:
             return False
 
-        # required minimum
         if "headline" not in data or "sentiment" not in data or "target" not in data:
-             return False
+            return False
 
-        # fill defaults instead of rejecting
         data.setdefault("impact", 0.3)
         data.setdefault("duration", 30)
         data.setdefault("volume_spike", 0.2)
@@ -82,18 +101,20 @@ class NewsEngine:
         return True
 
 
-# -------- CONVERTER FUNCTION --------
-from event_engine import MarketEvent
-
-
+# -------- CONVERTER (FIXED) --------
 def news_to_event(news):
 
-    return {
-        "target": news.get("target", "IT"),
-        "impact": news.get("impact", 0.3),
-        "sentiment": news.get("sentiment", 0),
-        "duration": news.get("duration", 30),
+    # ✅ Clamp values (VERY IMPORTANT)
+    sentiment = max(min(news.get("sentiment", 0), 1), -1)
+    impact = min(max(news.get("impact", 0.3), 0), 1)
+    duration = max(5, news.get("duration", 30))
+    volume_spike = min(max(news.get("volume_spike", 0.2), 0), 1)
 
-        # ✅ NEW
-        "decay": 0.97   # controls how fast effect fades
-    }
+    # ✅ RETURN OBJECT, NOT DICT
+    return MarketEvent(
+        sentiment=sentiment,
+        impact=impact,
+        duration=duration,
+        target=news.get("target", "IT"),
+        volume_spike=volume_spike
+    )

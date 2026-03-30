@@ -1,10 +1,9 @@
 import sys
 import os
+import time
+from dotenv import load_dotenv
 
 sys.path.append("D:/stocksimulator")
-
-import time
-import random
 
 from market_engine import MarketEngine
 from candle_engine import CandleEngine
@@ -13,39 +12,45 @@ from state import state
 from analytics.risk_engine import RiskEngine
 from analytics.pattern_engine import PatternEngine
 
-from event_engine import MarketEvent, event_engine
-
+from event_engine import EventEngine
 from news_engine import NewsEngine, news_to_event
-from dotenv import load_dotenv
-import os
 
-load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+API_KEY = os.getenv("GEMINI_API_KEY")
 
-news_engine = NewsEngine(api_key)
+print("LOADED KEY:", os.getenv("GEMINI_API_KEY"))
 
-engine = MarketEngine()
+if not API_KEY:
+    raise ValueError("❌ GEMINI_API_KEY not found")
+
+
+# -------- INIT SYSTEM --------
+# ✅ FIX: pass sector_map
+event_engine = EventEngine(state.sector_map)
+
+engine = MarketEngine(state, event_engine)
 candle_engine = CandleEngine()
 
 risk_engine = RiskEngine()
 pattern_engine = PatternEngine()
 
-test_event = MarketEvent(
-    sentiment=0.8,       # strong positive
-    impact=0.6,          # medium-strong impact
-    duration=30,         # lasts 30 seconds
-    target="IT",         # affects TCS & INFY
-    volume_spike=0.5     # volume increase
-)
-
-event_engine.add_event(test_event)
+news_engine = NewsEngine(API_KEY)
 
 
+# -------- RATE CONTROL --------
+last_news_time = 0
+NEWS_INTERVAL = 15   # seconds
+
+
+# -------- MAIN LOOP --------
 while True:
 
-    # -------- MARKET UPDATE --------
+    # -------- STEP 1: MARKET UPDATE --------
     engine.generate_tick(candle_engine)
-    event_engine.update()
+
+    # -------- STEP 2: EVENT CLEANUP (FIXED) --------
+    event_engine.cleanup()
 
     print("\n========== MARKET SNAPSHOT ==========")
 
@@ -65,24 +70,32 @@ while True:
     for stock in state.stock_prices:
         ratio = risk_engine.get_ratio(stock)
         pattern = pattern_engine.detect(stock)
-        print(stock, "RiskRatio:", round(ratio, 4), "Pattern:", pattern)
+        print(stock,
+              "RiskRatio:", round(ratio, 4),
+              "Pattern:", pattern)
 
-    # 🔥 NEWS BLOCK MUST BE HERE (INSIDE LOOP)
-    print("\n--- DEBUG START ---")
+    print("\nActive Events:", len(event_engine.active_events))
 
-    news = news_engine.generate_news()
-    print("RAW NEWS:", news)
+    # -------- STEP 3: AI NEWS --------
+    current_time = time.time()
 
-    is_valid = news_engine.validate(news)
-    print("IS VALID:", is_valid)
+    if current_time - last_news_time > NEWS_INTERVAL:
 
-    if is_valid:
-        print("HEADLINE:", news.get("headline"))
-        event = news_to_event(news)
-        event_engine.add_event(event)
-    else:
-        print("❌ FAILED VALIDATION")
+        print("\n🧠 Generating AI News...")
 
-    print("--- DEBUG END ---")
+        news = news_engine.generate_news()
 
+        if news and news_engine.validate(news):
+
+            print("📰 NEWS:", news["headline"])
+
+            event = news_to_event(news)
+            event_engine.add_event(event)
+
+        else:
+            print("⚠️ Invalid or empty news skipped")
+
+        last_news_time = current_time
+
+    # -------- LOOP DELAY --------
     time.sleep(1)
